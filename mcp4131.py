@@ -80,14 +80,12 @@ class MCP4131:
 
     # resistance btwn wiper and b
     def set_res(self, resistance):
-        # self.r_step = self.resistance / 128  # resistance of each resistor in ladder
-        # self.r_wiper = int( self.wiper_pos * 128) + 75  #wiper resistance is 75 ohm
-        self.set_pos(resistance/self.max_resistance)
+        self.set_pos((resistance-75)/self.max_resistance)  # wiper resistance is 75 ohm
 
 
     # set wiper position away from terminal B (0 at B, 1 at A)
     def set_pos(self, pos):
-        data = limit(int(128 * pos), 0, 128)
+        data = limit(int(127 * pos), 0, 127)
         self.write(ADDR_WPR_0, data)
 
 
@@ -97,25 +95,13 @@ class MCP4131:
         cmd = (reg<<4) | (CMD_WRITE<<2)
         self.send(reg, data)
 
-        # # 16 bit commands
-        # if data:
-        #     lsb = data
-        #     out = bytearray([msb, lsb])
-        # else:  # 8 bit commands
-        #     out = bytearray([msb])
-
-        # print("sending", out)
-        # self.spi.write(out)
-
         self.cs_pin(1)
 
     def send(self, cmd, data=None):
-        # self.cs_pin(0)
-
         cmd =  cmd | (0b11)  # open drain multiplexed sdo
 
         # 16 bit commands
-        if data:
+        if data != None:
             buf = bytearray(2)
             out = bytearray([cmd, data])
         else:  # 8 bit commands
@@ -124,12 +110,9 @@ class MCP4131:
 
         print("sending 0x{:X} (0b{:b})".format(int.from_bytes(out, "big"), int.from_bytes(out, "big")))
 
-        # self.spi.write(out)
         self.spi.write_readinto(out, buf)
 
         print("sent 0x{:X} (0b{:b})".format(int.from_bytes(buf, "big"), int.from_bytes(buf, "big")))
-
-        # self.cs_pin(1)
 
     
     def read(self, reg):
@@ -141,30 +124,15 @@ class MCP4131:
         # open drain multiplexed sdo set mosi to high when reading
         buf = self.spi.read(1, 0xFF)
 
-        # out = bytearray([cmd, 0xFF])
-        # self.spi.write_readinto(out, buf)
-
         print("received 0x{:X} (0b{:b})".format(int.from_bytes(buf, "big"), int.from_bytes(buf, "big")))
 
         self.cs_pin(1)
 
         return int.from_bytes(buf, "big")
 
-        # return buf[1]  # only return data part
-
     
     def get_status(self):
-        
-        self.cs_pin(0)
-
-        cmd = bytearray([(ADDR_STATUS<<4) | (CMD_READ<<2)])
-        print("sending 0x{:X}".format(int.from_bytes(cmd, "big")))
-        self.spi.write(cmd)
-
-        buf = self.spi.read(1, 0xFF)
-        
-        self.cs_pin(1)
-
+        buf = self.read(ADDR_STATUS)
         return buf
         
         
@@ -255,10 +223,10 @@ def read_write_test():
     pot1.deinit()
 
 # testing()
-read_status_test()
+# read_status_test()
 # write_reg_test()
-# write_position_test()
-# write_reistance_test()
+write_position_test()
+write_reistance_test()
 # used_pins_test()
 # test_limit()
 read_write_test()
