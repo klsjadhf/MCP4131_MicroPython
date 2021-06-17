@@ -30,14 +30,17 @@ def limit(num, min, max):
     else:
         return num
 
+
+def extract_bit(num, bit):
+    return (num >> bit) & 1
+
 class MCP4131:
     used_cs_pins = []
 
-    def __init__(self, bus, cs, res=RES_10K):
+    def __init__(self, bus, cs, res=RES_10K, mode=MODE_11, baud=250000):
         self.spi_bus = bus
-        self.baud = 250000  # 250kHz  actual baudrate=328125
-        self.set_mode(MODE_11)
-        self.crc = 0
+        self.baud = baud  # @250kHz actual baudrate=328125
+        self.set_mode(mode)
 
         self.max_resistance = res 
 
@@ -49,16 +52,8 @@ class MCP4131:
         else:
             raise Exception("Pin {} is already in use!".format(cs))
 
-        self.init_bus(bus)
-
-    def init_bus(self, bus=None):
-        if bus:
-            self.spi_bus = bus
-
-        if self.spi_bus:
-            # print("using spi bus", self.spi_bus)
-            self.spi = SPI(self.spi_bus, baudrate=self.baud, polarity=self.pol, phase=self.phase, firstbit=SPI.MSB)
-            # print(self.spi)  # show real baud rate
+        self.spi = SPI(self.spi_bus, baudrate=self.baud, polarity=self.pol, phase=self.phase, firstbit=SPI.MSB)
+        # print(self.spi)  # show real baud rate
 
 
     def deinit(self):
@@ -78,7 +73,7 @@ class MCP4131:
             self.phase = 1
 
 
-    # resistance btwn wiper and b
+    # resistance between wiper and b
     def set_res(self, resistance):
         self.set_pos((resistance-75)/self.max_resistance)  # wiper resistance is 75 ohm
 
@@ -91,12 +86,15 @@ class MCP4131:
 
     def write(self, reg, data):
         self.cs_pin(0)
+        time.sleep_us(60)
 
         cmd = (reg<<4) | (CMD_WRITE<<2)
-        self.send(reg, data)
+        self.send(cmd, data)
 
         self.cs_pin(1)
 
+
+    # returns true for vaild cmd, false for error
     def send(self, cmd, data=None):
         cmd =  cmd | (0b11)  # open drain multiplexed sdo
 
@@ -104,7 +102,8 @@ class MCP4131:
         if data != None:
             buf = bytearray(2)
             out = bytearray([cmd, data])
-        else:  # 8 bit commands
+        # 8 bit commands
+        else:  
             buf = bytearray(1)
             out = bytearray([cmd])
 
@@ -112,11 +111,22 @@ class MCP4131:
 
         self.spi.write_readinto(out, buf)
 
-        print("sent 0x{:X} (0b{:b})".format(int.from_bytes(buf, "big"), int.from_bytes(buf, "big")))
+        
+        # bit 9 is CMDERR bit. High is valid cmd, low is invalid cmd
+        # for some reason is bit 8 on mine?
+        if data != None:
+            cmderr = extract_bit( int.from_bytes(buf, "big"), 8)
+        else:
+            cmderr = extract_bit( int.from_bytes(buf, "big"), 0)
 
+        print("sent 0x{:X} (0b{:b}), cmderr:{}".format(int.from_bytes(buf, "big"), int.from_bytes(buf, "big"), cmderr))
+
+        return cmderr
     
+
     def read(self, reg):
         self.cs_pin(0)
+        time.sleep_us(60)
 
         cmd = (reg<<4) | (CMD_READ<<2)
         self.send(cmd)
@@ -130,7 +140,7 @@ class MCP4131:
 
         return int.from_bytes(buf, "big")
 
-    
+
     def get_status(self):
         buf = self.read(ADDR_STATUS)
         return buf
@@ -214,7 +224,7 @@ def test_limit():
     print(limit(129, 0, 128))  # expect 128
 
 def read_write_test():
-    print("\n\nread_write_test")
+    print("\n\n read_write_test")
     pot1 = MCP4131(spi_bus, cs_pin)
 
     pot1.write(ADDR_WPR_0, 100)
@@ -222,13 +232,41 @@ def read_write_test():
 
     pot1.deinit()
 
+def extract_bit_test():
+    print("\n\n extract_bit_test")
+
+    print(extract_bit(0b00000001, 0) == 1)
+    print(extract_bit(0b00000001, 1) == 0)
+    print(extract_bit(0b00000010, 1) == 1)
+    print(extract_bit(0b11111101, 1) == 0)
+    print(extract_bit(0b10111111, 6) == 0)
+    print(extract_bit(0b10110110, 5) == 1)
+    print(extract_bit(0b0110101010110110, 9) == 1)
+    print(extract_bit(0b0110101010110110, 10) == 0)
+
+def cmderr_test():
+    print("\n\n cmderr_test")
+    pot1 = MCP4131(spi_bus, cs_pin)
+    
+    # print(pot1.write(ADDR_WPR_0, 0))  # no error (1)
+    # print(pot1.write(ADDR_STATUS, 0))  # error (0)
+
+    # print(pot1.read(ADDR_WPR_0))  # no error (1)
+    # print(pot1.read(ADDR_WPR_1))  # error (0)
+
+    # print(pot1.read(0x02))  # error (0)
+    print(pot1.write(0x02, 0))  # error (0)
+
+    pot1.deinit()
+
 # testing()
 # read_status_test()
 # write_reg_test()
-write_position_test()
-write_reistance_test()
+# write_position_test()
+# write_reistance_test()
 # used_pins_test()
 # test_limit()
-read_write_test()
-
+# read_write_test()
+# extract_bit_test()
+cmderr_test()
 
