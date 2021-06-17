@@ -1,5 +1,4 @@
 # MicroPython library for MCP4131 digital potentiometer from Microchip（7 bit)
-# Reading requires proper values of limiting and pullup resistors
 
 import time
 from micropython import const
@@ -36,11 +35,10 @@ class MCP4131:
 
     def __init__(self, bus, cs, res=RES_10K):
         self.spi_bus = bus
-        self.baud = 10000  # 250kHz
-        self.set_mode(MODE_00)
+        self.baud = 250000  # 250kHz  actual baudrate=328125
+        self.set_mode(MODE_11)
         self.crc = 0
 
-        self.wiper_pos = 0.5  # default 50% on power on (0 is at position B, 1 at pos A)
         self.max_resistance = res 
 
         self.cs_pin = Pin(cs)
@@ -50,10 +48,6 @@ class MCP4131:
             self.used_cs_pins.append(self.cs_pin.name())
         else:
             raise Exception("Pin {} is already in use!".format(cs))
-
-        # Pin('PA5', Pin.OUT)
-        # Pin('PA6', Pin.IN)
-        # Pin('PA7', Pin.OUT)
 
         self.init_bus(bus)
 
@@ -100,48 +94,78 @@ class MCP4131:
     def write(self, reg, data):
         self.cs_pin(0)
 
-        msb = (reg<<4) | (CMD_WRITE<<2)
-        lsb = data
+        cmd = (reg<<4) | (CMD_WRITE<<2)
+        self.send(reg, data)
 
-        out = bytearray([msb, lsb])
-        print("sending", out)
-        self.spi.write(out)
+        # # 16 bit commands
+        # if data:
+        #     lsb = data
+        #     out = bytearray([msb, lsb])
+        # else:  # 8 bit commands
+        #     out = bytearray([msb])
+
+        # print("sending", out)
+        # self.spi.write(out)
 
         self.cs_pin(1)
 
-    # int to bin str (encoded)
-    def i2bStr(self, n):
-        buf = "{:b}".format(n)
-        buf.encode()
-        return buf
+    def send(self, cmd, data=None):
+        # self.cs_pin(0)
 
-    # string to integer
-    def str2bin(self, s):
-        s.decode()
-        v = int(s, 2)
-        return v
+        cmd =  cmd | (0b11)  # open drain multiplexed sdo
+
+        # 16 bit commands
+        if data:
+            buf = bytearray(2)
+            out = bytearray([cmd, data])
+        else:  # 8 bit commands
+            buf = bytearray(1)
+            out = bytearray([cmd])
+
+        print("sending 0x{:X} (0b{:b})".format(int.from_bytes(out, "big"), int.from_bytes(out, "big")))
+
+        # self.spi.write(out)
+        self.spi.write_readinto(out, buf)
+
+        print("sent 0x{:X} (0b{:b})".format(int.from_bytes(buf, "big"), int.from_bytes(buf, "big")))
+
+        # self.cs_pin(1)
+
     
-    # def get_status(self):
+    def read(self, reg):
+        self.cs_pin(0)
+
+        cmd = (reg<<4) | (CMD_READ<<2)
+        self.send(cmd)
+
+        # open drain multiplexed sdo set mosi to high when reading
+        buf = self.spi.read(1, 0xFF)
+
+        # out = bytearray([cmd, 0xFF])
+        # self.spi.write_readinto(out, buf)
+
+        print("received 0x{:X} (0b{:b})".format(int.from_bytes(buf, "big"), int.from_bytes(buf, "big")))
+
+        self.cs_pin(1)
+
+        return int.from_bytes(buf, "big")
+
+        # return buf[1]  # only return data part
+
+    
+    def get_status(self):
         
-    #     self.cs_pin.value(0)
+        self.cs_pin(0)
 
-    #     # time.sleep(0.01)
-    #     # buf = self.spi.recv(5)
-    #     # print(buf)
-    #     self.spi.send(0b00001100)
-    #     buf = self.spi.recv(1)
-    #     # self.spi.send(bytearray([0, 0]))
-    #     # buf = self.spi.recv(5)
+        cmd = bytearray([(ADDR_STATUS<<4) | (CMD_READ<<2)])
+        print("sending 0x{:X}".format(int.from_bytes(cmd, "big")))
+        self.spi.write(cmd)
 
-    #     # out = bytearray([0,0])  # MSB LSB
-    #     # buf = self.spi.send_recv(send=out)
-    #     # print(self.spi.read(3))
-    #     # buf = self.spi.recv(5)
-    #     # time.sleep(1)
+        buf = self.spi.read(1, 0xFF)
         
-    #     self.cs_pin.value(1)
+        self.cs_pin(1)
 
-    #     return buf
+        return buf
         
         
 
@@ -157,21 +181,21 @@ spi_bus = 1
 cs_pin = 'PA4'
 
 def testing():
-    print("testing")
+    print("\n\ntesting")
     pot1 = MCP4131(spi_bus, cs_pin)
     print(pot1.i2bStr(5))
     print(pot1.str2bin(b"101"))
     pot1.deinit()
 
-# dosent work because of multiplexed data lines
 def read_status_test():
-    print("read_status_test")
+    print("\n\nread_status_test")
     pot1 = MCP4131(spi_bus, cs_pin)
-    print(pot1.get_status())
+    # print(pot1.get_status())
+    print(hex(pot1.read(ADDR_STATUS)))
     pot1.deinit()
 
 def write_reg_test():
-    print("write_reg_test")
+    print("\n\nwrite_reg_test")
     pot1 = MCP4131(spi_bus, cs_pin)
     pot1.write(ADDR_WPR_0, 0)  # pos b
     time.sleep(3)
@@ -180,7 +204,7 @@ def write_reg_test():
     pot1.deinit()
 
 def write_position_test():
-    print("write_position_test")
+    print("\n\nwrite_position_test")
     pot1 = MCP4131(spi_bus, cs_pin)
     pot1.set_pos(0) # at terminal b
     time.sleep(3)
@@ -192,7 +216,7 @@ def write_position_test():
 
 # resistance from wiper to term b
 def write_reistance_test():
-    print("write_reistance_test")
+    print("\n\nwrite_reistance_test")
     pot1 = MCP4131(spi_bus, cs_pin)
     pot1.set_res(0)
     time.sleep(3)
@@ -203,7 +227,7 @@ def write_reistance_test():
     pot1.deinit()
 
 def used_pins_test():
-    print("used_pins_test")
+    print("\n\nused_pins_test")
     pot1 = MCP4131(spi_bus, cs_pin)
     print("pot1")
     try:
@@ -214,30 +238,29 @@ def used_pins_test():
     pot1.deinit()
 
 def test_limit():
-    print("test_limit")
+    print("\n\ntest_limit")
     print(limit(100, 0, 128))  # expect 100
     print(limit(0, 0, 128))  # expect 0
     print(limit(128, 0, 128))  # expect 128
     print(limit(-1, 0, 128))  # expect 0
     print(limit(129, 0, 128))  # expect 128
 
+def read_write_test():
+    print("\n\nread_write_test")
+    pot1 = MCP4131(spi_bus, cs_pin)
+
+    pot1.write(ADDR_WPR_0, 100)
+    print(pot1.read(ADDR_WPR_0))
+
+    pot1.deinit()
+
 # testing()
-# read_status_test()
-write_reg_test()
-write_position_test()
-write_reistance_test()
+read_status_test()
+# write_reg_test()
+# write_position_test()
+# write_reistance_test()
 # used_pins_test()
 # test_limit()
+read_write_test()
 
-# a4 = Pin("A4")
-# print("A4", a4.af_list(), a4.af())
-
-# a5 = Pin("A5")
-# print("A5", a5.af_list(), a5.af())
-
-# a6 = Pin("A6")
-# print("A6", a6.af_list(), a6.af())
-
-# a7 = Pin("A7")
-# print("A7", a7.af_list(), a7.af())
 
