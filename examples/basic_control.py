@@ -1,6 +1,11 @@
 import time
 import mcp4131 as mcp
 
+# spi 1 for stm32f407
+# pa5 spi_sck
+# pa6 spi_miso
+# pa7 spi_mosi
+
 # required inputs: pin for chip select
 # parameters:
 #    bus = 1  default is bus 1

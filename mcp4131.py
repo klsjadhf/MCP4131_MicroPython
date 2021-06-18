@@ -179,12 +179,10 @@ class MCP4131:
         self.cs_pin(1)
         
 
-    def tcon(self, data=-1):
-        if data == -1:
-            return self.read(ADDR_TCON)
-        else:
+    def tcon(self, data=None):
+        if data != None:
             self.write(ADDR_TCON, data)
-
+        return self.read(ADDR_TCON)
     
     # IC only has one pot, resistor 1 not supported
     def term_con(self, term, con=-1):
