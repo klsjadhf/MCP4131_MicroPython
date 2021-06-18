@@ -1,10 +1,4 @@
-# MicroPython library for MCP4131 digital potentiometer from Microchip（7 bit)
-
-# spi 1 for stm32f407
-# pa4 spi_nss (slave select not needed in master mode)
-# pa5 spi_sck
-# pa6 spi_miso
-# pa7 spi_mosi
+# MicroPython library for MCP4131 digital potentiometer from Microchip（7 bit SPI)
 
 import time
 from micropython import const
