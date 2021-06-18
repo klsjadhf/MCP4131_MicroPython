@@ -7,7 +7,7 @@ import mcp4131 as mcp
 # pa7 spi_mosi
 
 # required inputs: pin for chip select
-# parameters:
+# optional parameters:
 #    bus = 1  default is bus 1
 #    res = RES_10K (default) max resistance of the pot
 #          RES_5K
