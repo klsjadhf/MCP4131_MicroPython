@@ -13,4 +13,4 @@ PA7 | MOSI
 
 ## Problems
 CMDERR bit not working properly  
-Math not fully checked mght be off by 1 bit, etc
+Math not fully checked might be off by 1 bit, etc
