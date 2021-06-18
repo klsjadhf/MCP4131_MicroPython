@@ -197,6 +197,7 @@ class MCP4131:
 
 
     # IC doesn't have shutdown pin, control shutdown through TCON register
+    # 1 is shutdown, 0 is not in shutdown (opp of value in TCON register)
     def shutdown(self, s=-1):
         if s == -1:
             pass
@@ -204,5 +205,5 @@ class MCP4131:
             s = 0
         else:
             s = 1
-        return self.term_con(TERM_SHUTDOWN, s)
+        return not self.term_con(TERM_SHUTDOWN, s)
         

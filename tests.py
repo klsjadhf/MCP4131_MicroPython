@@ -1,3 +1,5 @@
+# ignore everything here. not used anymore
+
 import mcp4131
 import time
 # spi 1 for stm32f407
