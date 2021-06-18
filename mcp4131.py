@@ -2,13 +2,14 @@
 
 import time
 from micropython import const
+# import micropython
 from machine import Pin, SPI
 
 MODE_00 = const(0)
 MODE_11 = const(1)
 
 ADDR_WPR_0 =  const(0x00)
-ADDR_WPR_1 =  const(0x01)
+# ADDR_WPR_1 =  const(0x01)
 ADDR_TCON =   const(0x04)
 ADDR_STATUS = const(0x05)
 
@@ -22,6 +23,15 @@ RES_10K =  const(10000)
 RES_50K =  const(50000)
 RES_100K = const(100000)
 
+TERM_WPR = const(1)
+TERM_A =   const(2)
+TERM_B =   const(0)
+TERM_SHUTDOWN =  const(3)
+
+CONNECT =    const(1)
+DISCONNECT = const(0)
+
+
 def limit(num, min, max):
     if num < min:
         return min
@@ -33,6 +43,7 @@ def limit(num, min, max):
 
 def extract_bit(num, bit):
     return (num >> bit) & 1
+
 
 class MCP4131:
     used_cs_pins = []
@@ -167,6 +178,51 @@ class MCP4131:
         buf = self.read(ADDR_STATUS)
         return buf
         
+
+    def tcon(self, data=-1):
+        if data == -1:
+            return self.read(ADDR_TCON)
+        else:
+            self.write(ADDR_TCON, data)
+
+    
+    # IC only has one pot, resistor 1 not supported
+    def term_con(self, term, con=-1):
+        tmp = self.tcon()
+        if con == 1:
+            tmp = tmp | (1<<term)
+            self.tcon(tmp)
+        elif con == 0:
+            tmp = tmp & ~(1<<term)
+            self.tcon(tmp)
+        return extract_bit(self.tcon(), term)
+
+
+    # IC doesn't have shutdown pin, control shutdown through TCON register
+    def shutdown(self, s=-1):
+        if s == -1:
+            pass
+        elif s:
+            s = 0
+        else:
+            s = 1
+        return self.term_con(TERM_SHUTDOWN, s)
+
+    # # not supported use tcon for shutdown
+    # def shutdown(self, s=-1):
+    #     # get shutdown status
+    #     if s == -1:
+    #         s = extract_bit( self.read(ADDR_STATUS), 1)  #bit 1 of status reg is shutdown shutdown status
+    #     # shutdown 
+    #     elif s==1:
+    #         self.write(ADDR_STATUS, 0x02)
+    #     # exit shutdown 
+    #     elif s==0:
+    #         self.write(ADDR_STATUS, 0x00)
+    #     else:
+    #         raise Exception("Unsupported command for shutdown")
+
+    #     return s
         
 
 # spi 1 for stm32f407
@@ -180,127 +236,197 @@ class MCP4131:
 spi_bus = 1
 cs_pin = 'PA4'
 
-def testing():
-    print("\n\ntesting")
-    pot1 = MCP4131(spi_bus, cs_pin)
-    print(pot1.i2bStr(5))
-    print(pot1.str2bin(b"101"))
-    pot1.deinit()
+# def testing():
+#     print("\n\ntesting")
+#     pot1 = MCP4131(spi_bus, cs_pin)
+#     print(pot1.i2bStr(5))
+#     print(pot1.str2bin(b"101"))
+#     pot1.deinit()
 
-def read_status_test():
-    print("\n\nread_status_test")
-    pot1 = MCP4131(spi_bus, cs_pin)
-    # print(pot1.get_status())
-    print(hex(pot1.read(ADDR_STATUS)))
-    pot1.deinit()
+# def read_status_test():
+#     print("\n\nread_status_test")
+#     pot1 = MCP4131(spi_bus, cs_pin)
+#     # print(pot1.get_status())
+#     print(hex(pot1.read(ADDR_STATUS)))
+#     pot1.deinit()
 
-def write_reg_test():
-    print("\n\nwrite_reg_test")
-    pot1 = MCP4131(spi_bus, cs_pin)
-    pot1.write(ADDR_WPR_0, 0)  # pos b
-    time.sleep(3)
-    pot1.write(ADDR_WPR_0, 128)  # pos a
-    time.sleep(3)
-    pot1.deinit()
+# def write_reg_test():
+#     print("\n\nwrite_reg_test")
+#     pot1 = MCP4131(spi_bus, cs_pin)
+#     pot1.write(ADDR_WPR_0, 0)  # pos b
+#     time.sleep(3)
+#     pot1.write(ADDR_WPR_0, 128)  # pos a
+#     time.sleep(3)
+#     pot1.deinit()
 
-def write_position_test():
-    print("\n\nwrite_position_test")
-    pot1 = MCP4131(spi_bus, cs_pin)
-    pot1.set_pos(0) # at terminal b
-    time.sleep(3)
-    pot1.set_pos(1) # at terminal a
-    time.sleep(3)
-    pot1.set_pos(0.5) # halfway
-    time.sleep(3)
-    pot1.deinit()
+# def write_position_test():
+#     print("\n\nwrite_position_test")
+#     pot1 = MCP4131(spi_bus, cs_pin)
+#     pot1.set_pos(0) # at terminal b
+#     time.sleep(3)
+#     pot1.set_pos(1) # at terminal a
+#     time.sleep(3)
+#     pot1.set_pos(0.5) # halfway
+#     time.sleep(3)
+#     pot1.deinit()
 
-# resistance from wiper to term b
-def write_reistance_test():
-    print("\n\nwrite_reistance_test")
-    pot1 = MCP4131(spi_bus, cs_pin)
-    pot1.set_res(0)
-    time.sleep(3)
-    pot1.set_res(7000)
-    time.sleep(3)
-    pot1.set_res(10000)
-    time.sleep(3)
-    pot1.deinit()
+# # resistance from wiper to term b
+# def write_reistance_test():
+#     print("\n\nwrite_reistance_test")
+#     pot1 = MCP4131(spi_bus, cs_pin)
+#     pot1.set_res(0)
+#     time.sleep(3)
+#     pot1.set_res(7000)
+#     time.sleep(3)
+#     pot1.set_res(10000)
+#     time.sleep(3)
+#     pot1.deinit()
 
-def used_pins_test():
-    print("\n\nused_pins_test")
-    pot1 = MCP4131(spi_bus, cs_pin)
-    print("pot1")
-    try:
-        pot2 = MCP4131(spi_bus, cs_pin)
-    except Exception as e:
-        print(e)
-    print("pot2")
-    pot1.deinit()
+# def used_pins_test():
+#     print("\n\nused_pins_test")
+#     pot1 = MCP4131(spi_bus, cs_pin)
+#     print("pot1")
+#     try:
+#         pot2 = MCP4131(spi_bus, cs_pin)
+#     except Exception as e:
+#         print(e)
+#     print("pot2")
+#     pot1.deinit()
 
-def test_limit():
-    print("\n\ntest_limit")
-    print(limit(100, 0, 128))  # expect 100
-    print(limit(0, 0, 128))  # expect 0
-    print(limit(128, 0, 128))  # expect 128
-    print(limit(-1, 0, 128))  # expect 0
-    print(limit(129, 0, 128))  # expect 128
+# def test_limit():
+#     print("\n\ntest_limit")
+#     print(limit(100, 0, 128))  # expect 100
+#     print(limit(0, 0, 128))  # expect 0
+#     print(limit(128, 0, 128))  # expect 128
+#     print(limit(-1, 0, 128))  # expect 0
+#     print(limit(129, 0, 128))  # expect 128
 
-def read_write_test():
-    print("\n\n read_write_test")
-    pot1 = MCP4131(spi_bus, cs_pin)
+# def read_write_test():
+#     print("\n\n read_write_test")
+#     pot1 = MCP4131(spi_bus, cs_pin)
 
-    pot1.write(ADDR_WPR_0, 11)
-    print(pot1.read(ADDR_WPR_0))
+#     pot1.write(ADDR_WPR_0, 11)
+#     print(pot1.read(ADDR_WPR_0))
 
-    pot1.deinit()
+#     pot1.deinit()
 
-def extract_bit_test():
-    print("\n\n extract_bit_test")
+# def extract_bit_test():
+#     print("\n\n extract_bit_test")
 
-    print(extract_bit(0b00000001, 0) == 1)
-    print(extract_bit(0b00000001, 1) == 0)
-    print(extract_bit(0b00000010, 1) == 1)
-    print(extract_bit(0b11111101, 1) == 0)
-    print(extract_bit(0b10111111, 6) == 0)
-    print(extract_bit(0b10110110, 5) == 1)
-    print(extract_bit(0b0110101010110110, 9) == 1)
-    print(extract_bit(0b0110101010110110, 10) == 0)
+#     print(extract_bit(0b00000001, 0) == 1)
+#     print(extract_bit(0b00000001, 1) == 0)
+#     print(extract_bit(0b00000010, 1) == 1)
+#     print(extract_bit(0b11111101, 1) == 0)
+#     print(extract_bit(0b10111111, 6) == 0)
+#     print(extract_bit(0b10110110, 5) == 1)
+#     print(extract_bit(0b0110101010110110, 9) == 1)
+#     print(extract_bit(0b0110101010110110, 10) == 0)
 
-def cmderr_test():
-    print("\n\n cmderr_test")
-    pot1 = MCP4131(spi_bus, cs_pin)
+# def cmderr_test():
+#     print("\n\n cmderr_test")
+#     pot1 = MCP4131(spi_bus, cs_pin)
     
-    print(pot1.write(ADDR_WPR_0, 0))  # no error (1)
-    print(pot1.write(ADDR_STATUS, 0))  # error (0)
+#     print(pot1.write(ADDR_WPR_0, 0))  # no error (1)
+#     print(pot1.write(ADDR_STATUS, 0))  # error (0)
 
-    print(pot1.read(ADDR_WPR_0))  # no error (1)
-    # print(pot1.read(ADDR_WPR_1))  # error (0)
+#     print(pot1.read(ADDR_WPR_0))  # no error (1)
+#     # print(pot1.read(ADDR_WPR_1))  # error (0)
 
-    # print(pot1.read(0x02))  # error (0)
-    # print(pot1.write(0x02, 0))  # error (0)
+#     # print(pot1.read(0x02))  # error (0)
+#     # print(pot1.write(0x02, 0))  # error (0)
 
-    pot1.deinit()
+#     pot1.deinit()
 
-def increment_test():
-    print("\n\n increment_test")
+# def increment_test():
+#     print("\n\n increment_test")
+#     pot1 = MCP4131(spi_bus, cs_pin)
+
+#     print(pot1.read(ADDR_WPR_0))
+#     pot1.inc()
+#     print(pot1.read(ADDR_WPR_0))
+
+#     pot1.deinit()
+
+# def decrement_test():
+    # print("\n\n decrement_test")
+    # pot1 = MCP4131(spi_bus, cs_pin)
+
+    # print(pot1.read(ADDR_WPR_0))
+    # pot1.dec()
+    # print(pot1.read(ADDR_WPR_0))
+
+    # pot1.deinit()
+
+def shutdown_test():
+    print("\n\n shutdown_test")
     pot1 = MCP4131(spi_bus, cs_pin)
 
-    print(pot1.read(ADDR_WPR_0))
-    pot1.inc()
-    print(pot1.read(ADDR_WPR_0))
+    print(pot1.shutdown())
+    pot1.shutdown(1)
+    print(pot1.shutdown())
+    time.sleep(3)
+    pot1.shutdown(0)
+    print(pot1.shutdown())
+    time.sleep(3)
 
     pot1.deinit()
 
-def decrement_test():
-    print("\n\n decrement_test")
+def tcon_test():
+    print("\n\n tcon_test")
     pot1 = MCP4131(spi_bus, cs_pin)
 
-    print(pot1.read(ADDR_WPR_0))
-    pot1.dec()
-    print(pot1.read(ADDR_WPR_0))
+    print(pot1.tcon())
+
+    # print("shutdown res 0")
+    # pot1.tcon(0b11110111)
+    # print(pot1.read(ADDR_STATUS))
+    # time.sleep(3)
+
+    # print("disconnect term a")
+    # pot1.tcon(0b11111011)
+    # time.sleep(3)
+
+    # print("disconnect wiper")
+    # pot1.tcon(0b11111101)
+    # time.sleep(3)
+
+    print("disconnect term b")
+    pot1.tcon(0b11111110)
+    time.sleep(3)
 
     pot1.deinit()
 
+def term_con_test():
+    print("\n\n term_con_test")
+    pot1 = MCP4131(spi_bus, cs_pin)
+
+    print("term a", pot1.term_con(TERM_A))
+    pot1.term_con(TERM_A, DISCONNECT)
+    print(pot1.term_con(TERM_A))
+    time.sleep(3)
+    # pot1.term_con(TERM_A, CONNECT)
+    # print(pot1.term_con(TERM_A))
+    # time.sleep(3)
+
+    print("term b", pot1.term_con(TERM_B))
+    pot1.term_con(TERM_B, DISCONNECT)
+    print(pot1.term_con(TERM_B))
+    # time.sleep(3)
+    # pot1.term_con(TERM_B, CONNECT)
+    # print(pot1.term_con(TERM_B))
+    # time.sleep(3)
+
+    # print("wiper", pot1.term_con(TERM_WPR))
+    # pot1.term_con(TERM_A, DISCONNECT)
+    # print(pot1.term_con(TERM_WPR))
+    # time.sleep(3)
+    # pot1.term_con(TERM_A, CONNECT)
+    # print(pot1.term_con(TERM_WPR))
+    # time.sleep(3)
+
+    pot1.deinit()
+
+# micropython.mem_info()
 # testing()
 # read_status_test()
 # write_reg_test()
@@ -308,9 +434,11 @@ def decrement_test():
 # write_reistance_test()
 # used_pins_test()
 # test_limit()
-read_write_test()
+# read_write_test()
 # extract_bit_test()
 # cmderr_test()
-increment_test()
-decrement_test()
-
+# increment_test()
+# decrement_test()
+shutdown_test()
+# tcon_test()
+# term_con_test()
