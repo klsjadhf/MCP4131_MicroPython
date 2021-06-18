@@ -53,7 +53,7 @@ def extract_bit(num, bit):
 class MCP4131:
     used_cs_pins = []
 
-    def __init__(self, bus, cs, res=RES_10K, mode=MODE_11, baud=250000):
+    def __init__(self, cs, bus=1, res=RES_10K, mode=MODE_11, baud=250000):
         self.spi_bus = bus
         self.baud = baud  # @250kHz actual baudrate=328125
         self.set_mode(mode)
@@ -67,8 +67,6 @@ class MCP4131:
             self.used_cs_pins.append(self.cs_pin.name())
         else:
             raise Exception("Pin {} is already in use!".format(cs))
-
-        pa5 = Pin("PA7", Pin.ALT_OPEN_DRAIN, alt=5)
 
         self.spi = SPI(self.spi_bus, baudrate=self.baud, polarity=self.pol, phase=self.phase, firstbit=SPI.MSB)
         # print(self.spi)  # show real baud rate
@@ -132,7 +130,6 @@ class MCP4131:
 
         self.spi.write_readinto(out, buf)
 
-        
         # bit 9 is CMDERR bit. High is valid cmd, low is invalid cmd
         # not working
         if data != None:
