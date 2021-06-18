@@ -8,7 +8,7 @@ pot1 = mcp.MCP4131("PA4")
 #       values: ADDR_WPR_0
 #               ADDR_TCON
 #               ADDR_STATUS
-#   return: CMDERR bit (currently not working)
+#   return: nothing
 pot1.write(mcp.ADDR_WPR_0, 0x05)  # write 0x05 into register for resistor 0
 
 # read register function
