@@ -43,14 +43,16 @@ class MCP4131:
         self.set_mode(mode)
 
         self.max_resistance = res 
+        self.cmderr = 1  # 0 is error
 
         self.cs_pin = Pin(cs)
         if self.cs_pin.name() not in self.used_cs_pins:
-            self.cs_pin.init(mode=Pin.OUT)
-            self.cs_pin(1)  # active low
+            self.cs_pin.init(mode=Pin.OUT, value=1)
             self.used_cs_pins.append(self.cs_pin.name())
         else:
             raise Exception("Pin {} is already in use!".format(cs))
+
+        pa5 = Pin("PA7", Pin.ALT_OPEN_DRAIN, alt=5)
 
         self.spi = SPI(self.spi_bus, baudrate=self.baud, polarity=self.pol, phase=self.phase, firstbit=SPI.MSB)
         # print(self.spi)  # show real baud rate
@@ -88,7 +90,7 @@ class MCP4131:
         self.cs_pin(0)
         time.sleep_us(60)
 
-        cmd = (reg<<4) | (CMD_WRITE<<2)
+        cmd = (reg<<4) | (CMD_WRITE<<2) 
         self.send(cmd, data)
 
         self.cs_pin(1)
@@ -96,7 +98,7 @@ class MCP4131:
 
     # returns true for vaild cmd, false for error
     def send(self, cmd, data=None):
-        cmd =  cmd | (0b11)  # open drain multiplexed sdo
+        # cmd =  cmd | (0b11)  # open drain multiplexed sdo
 
         # 16 bit commands
         if data != None:
@@ -115,13 +117,13 @@ class MCP4131:
         # bit 9 is CMDERR bit. High is valid cmd, low is invalid cmd
         # for some reason is bit 8 on mine?
         if data != None:
-            cmderr = extract_bit( int.from_bytes(buf, "big"), 8)
+            self.cmderr = extract_bit( int.from_bytes(buf, "big"), 8)
         else:
-            cmderr = extract_bit( int.from_bytes(buf, "big"), 0)
+            self.cmderr = extract_bit( int.from_bytes(buf, "big"), 0)
 
-        print("sent 0x{:X} (0b{:b}), cmderr:{}".format(int.from_bytes(buf, "big"), int.from_bytes(buf, "big"), cmderr))
+        print("sent 0x{:X} (0b{:b}), cmderr:{}".format(int.from_bytes(buf, "big"), int.from_bytes(buf, "big"), self.cmderr))
 
-        return cmderr
+        return self.cmderr
     
 
     def read(self, reg):
@@ -139,6 +141,26 @@ class MCP4131:
         self.cs_pin(1)
 
         return int.from_bytes(buf, "big")
+
+
+    def inc(self, wiper=ADDR_WPR_0):
+        self.cs_pin(0)
+        time.sleep_us(60)
+
+        cmd = (wiper<<4) | (CMD_INCR<<2)
+        self.send(cmd)
+
+        self.cs_pin(1)
+
+    
+    def dec(self, wiper=ADDR_WPR_0):
+        self.cs_pin(0)
+        time.sleep_us(60)
+
+        cmd = (wiper<<4) | (CMD_DECR<<2)
+        self.send(cmd)
+
+        self.cs_pin(1)
 
 
     def get_status(self):
@@ -227,7 +249,7 @@ def read_write_test():
     print("\n\n read_write_test")
     pot1 = MCP4131(spi_bus, cs_pin)
 
-    pot1.write(ADDR_WPR_0, 100)
+    pot1.write(ADDR_WPR_0, 11)
     print(pot1.read(ADDR_WPR_0))
 
     pot1.deinit()
@@ -248,14 +270,34 @@ def cmderr_test():
     print("\n\n cmderr_test")
     pot1 = MCP4131(spi_bus, cs_pin)
     
-    # print(pot1.write(ADDR_WPR_0, 0))  # no error (1)
-    # print(pot1.write(ADDR_STATUS, 0))  # error (0)
+    print(pot1.write(ADDR_WPR_0, 0))  # no error (1)
+    print(pot1.write(ADDR_STATUS, 0))  # error (0)
 
-    # print(pot1.read(ADDR_WPR_0))  # no error (1)
+    print(pot1.read(ADDR_WPR_0))  # no error (1)
     # print(pot1.read(ADDR_WPR_1))  # error (0)
 
     # print(pot1.read(0x02))  # error (0)
-    print(pot1.write(0x02, 0))  # error (0)
+    # print(pot1.write(0x02, 0))  # error (0)
+
+    pot1.deinit()
+
+def increment_test():
+    print("\n\n increment_test")
+    pot1 = MCP4131(spi_bus, cs_pin)
+
+    print(pot1.read(ADDR_WPR_0))
+    pot1.inc()
+    print(pot1.read(ADDR_WPR_0))
+
+    pot1.deinit()
+
+def decrement_test():
+    print("\n\n decrement_test")
+    pot1 = MCP4131(spi_bus, cs_pin)
+
+    print(pot1.read(ADDR_WPR_0))
+    pot1.dec()
+    print(pot1.read(ADDR_WPR_0))
 
     pot1.deinit()
 
@@ -266,7 +308,9 @@ def cmderr_test():
 # write_reistance_test()
 # used_pins_test()
 # test_limit()
-# read_write_test()
+read_write_test()
 # extract_bit_test()
-cmderr_test()
+# cmderr_test()
+increment_test()
+decrement_test()
 
