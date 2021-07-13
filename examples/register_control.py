@@ -1,13 +1,14 @@
 import time
-import mcp4131 as mcp
+import mcp41xx31 as mcp
 
-pot1 = mcp.MCP4131("PA4")
+pot1 = mcp.MCP4131("PB12", bus=2, res=mcp.RES_10K)
+# pot1 = mcp.MCP41HV31("PB11", bus=2, res=mcp.RES_100K)
 
 # write register function
 #   input: register to write, data
 #       values: ADDR_WPR_0
 #               ADDR_TCON
-#               ADDR_STATUS
+#               ADDR_STATUS (not avaliable in HV version)
 #   return: nothing
 pot1.write(mcp.ADDR_WPR_0, 0x05)  # write 0x05 into register for resistor 0
 
@@ -15,7 +16,7 @@ pot1.write(mcp.ADDR_WPR_0, 0x05)  # write 0x05 into register for resistor 0
 #   input: register to read
 #       values: ADDR_WPR_0
 #               ADDR_TCON
-#               ADDR_STATUS
+#               ADDR_STATUS (not avaliable in HV version)
 #   return: value in register
 print("ADDR_WPR_0", pot1.read(mcp.ADDR_WPR_0))  # print current value for resistor 0
 
