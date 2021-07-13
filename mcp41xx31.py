@@ -8,7 +8,7 @@ MODE_00 = const(0)
 MODE_11 = const(1)
 
 ADDR_WPR_0 =  const(0x00)
-# ADDR_WPR_1 =  const(0x01)
+# ADDR_WPR_1 =  const(0x01)  # dual resistor version not supported
 ADDR_TCON =   const(0x04)
 ADDR_STATUS = const(0x05)
 
@@ -79,6 +79,9 @@ class MCP41xx31:
 
 
     def write(self, reg, data):
+        if reg not in self.registers:
+            raise Exception("Invaild register: 0x{:02X}".format(reg))
+
         self.cs_pin(0)
         time.sleep_us(60)
 
@@ -173,6 +176,13 @@ class MCP41xx31:
         
 
 class MCP4131(MCP41xx31):
+    registers = [
+        ADDR_WPR_0,
+        ADDR_TCON,
+        ADDR_STATUS
+    ]
+
+
     def __init__(self, cs, bus=1, res=RES_10K, mode=MODE_11, baud=250000):
         self.spi_bus = bus
         self.baud = baud  # @250kHz actual baudrate=328125
@@ -204,6 +214,10 @@ class MCP4131(MCP41xx31):
 
 
 class MCP41HV31(MCP41xx31):
+    registers = [
+        ADDR_WPR_0,
+        ADDR_TCON
+    ]
     used_sd_pins = []
     used_wl_pins = []
 
@@ -246,7 +260,7 @@ class MCP41HV31(MCP41xx31):
         self.spi = SPI(self.spi_bus, baudrate=self.baud, polarity=self.pol, phase=self.phase, firstbit=SPI.MSB)
         # print(self.spi)  # show real baud rate
 
-
+    # not tested
     # set/get wiper latch to sync transfers from register to wiper
     def wiperLatch(self, l=-1):
         if self.wl_pin != None:
@@ -261,6 +275,7 @@ class MCP41HV31(MCP41xx31):
     # 1 is shutdown, 0 is not in shutdown (opp of value in TCON register)
     def shutdown(self, s=-1):
 
+        # not tested
         # shutdown through sd pin
         if self.sd_pin != None:
             if s == -1:
