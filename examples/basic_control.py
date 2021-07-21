@@ -1,5 +1,5 @@
 import time
-import mcp4131 as mcp
+import mcp41xx31 as mcp
 
 # required inputs: pin for chip select
 # optional parameters:
@@ -11,21 +11,21 @@ import mcp4131 as mcp
 #    mode = MODE_11 (default) spi mode 
 #           MODE_00
 #    baud = 250000 (baud rate may not be same as what you set. depends on clock dividers)
-pot1 = mcp.MCP4131("PA4", res=mcp.RES_10K)
-pot2 = mcp.MCP4131("PA3")
+pot1 = mcp.MCP4131("PB12", bus=2, res=mcp.RES_10K)
+pot2 = mcp.MCP41HV31("PB11", bus=2, res=mcp.RES_100K)
 
 r_list = [0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000]
-for i in range(10):
+for i in range(11):
     # res function 
     #   input: resistance measured from wiper to terminal B
     #   return: current resistance from registers
     pot1.res(r_list[i])  # set resistance from list
-    print(pot1.res())
+    print(r_list[i], pot1.res())
 
     # pos function
     #   input: postion from terminal B (0 is at B, 1 is at A, 0.5 is mid position)
     #   return: current position calcuated from register value
-    print( pot2.pos( 1-(i/11) ) )  # decreasing resistance
+    print( 1-(i/10), pot2.pos( 1-(i/10) ) )  # decreasing resistance
 
     time.sleep(3)
 

@@ -8,7 +8,7 @@ MODE_00 = const(0)
 MODE_11 = const(1)
 
 ADDR_WPR_0 =  const(0x00)
-# ADDR_WPR_1 =  const(0x01)
+# ADDR_WPR_1 =  const(0x01)  # dual resistor version not supported
 ADDR_TCON =   const(0x04)
 ADDR_STATUS = const(0x05)
 
@@ -44,27 +44,8 @@ def extract_bit(num, bit):
     return (num >> bit) & 1
 
 
-class MCP4131:
+class MCP41xx31:
     used_cs_pins = []
-
-    def __init__(self, cs, bus=1, res=RES_10K, mode=MODE_11, baud=250000):
-        self.spi_bus = bus
-        self.baud = baud  # @250kHz actual baudrate=328125
-        self.set_mode(mode)
-
-        self.max_resistance = res 
-        self.cmderr = 1  # 0 is error
-
-        self.cs_pin = Pin(cs)
-        if self.cs_pin.name() not in self.used_cs_pins:
-            self.cs_pin.init(mode=Pin.OUT, value=1)
-            self.used_cs_pins.append(self.cs_pin.name())
-        else:
-            raise Exception("Pin {} is already in use!".format(cs))
-
-        self.spi = SPI(self.spi_bus, baudrate=self.baud, polarity=self.pol, phase=self.phase, firstbit=SPI.MSB)
-        # print(self.spi)  # show real baud rate
-
 
     def deinit(self):
         self.spi.deinit()
@@ -98,6 +79,9 @@ class MCP4131:
 
 
     def write(self, reg, data):
+        if reg not in self.registers:
+            raise Exception("Invaild register: 0x{:02X}".format(reg))
+
         self.cs_pin(0)
         time.sleep_us(60)
 
@@ -177,6 +161,7 @@ class MCP4131:
         if data != None:
             self.write(ADDR_TCON, data)
         return self.read(ADDR_TCON)
+
     
     # IC only has one pot, resistor 1 not supported
     def term_con(self, term, con=-1):
@@ -188,9 +173,35 @@ class MCP4131:
             tmp = tmp & ~(1<<term)
             self.tcon(tmp)
         return extract_bit(self.tcon(), term)
+        
+
+class MCP4131(MCP41xx31):
+    registers = [
+        ADDR_WPR_0,
+        ADDR_TCON,
+        ADDR_STATUS
+    ]
 
 
-    # IC doesn't have shutdown pin, control shutdown through TCON register
+    def __init__(self, cs, bus=1, res=RES_10K, mode=MODE_11, baud=250000):
+        self.spi_bus = bus
+        self.baud = baud  # @250kHz actual baudrate=328125
+        self.set_mode(mode)
+
+        self.max_resistance = res 
+        self.cmderr = 1  # 0 is error
+
+        self.cs_pin = Pin(cs)
+        if self.cs_pin.name() not in self.used_cs_pins:
+            self.cs_pin.init(mode=Pin.OUT, value=1)
+            self.used_cs_pins.append(self.cs_pin.name())
+        else:
+            raise Exception("Pin {} is already in use!".format(cs))
+
+        self.spi = SPI(self.spi_bus, baudrate=self.baud, polarity=self.pol, phase=self.phase, firstbit=SPI.MSB)
+        # print(self.spi)  # show real baud rate
+
+    # MCP4131 doesn't have shutdown pin, control shutdown through TCON register
     # 1 is shutdown, 0 is not in shutdown (opp of value in TCON register)
     def shutdown(self, s=-1):
         if s == -1:
@@ -200,4 +211,85 @@ class MCP4131:
         else:
             s = 1
         return not self.term_con(TERM_SHUTDOWN, s)
-        
+
+
+class MCP41HV31(MCP41xx31):
+    registers = [
+        ADDR_WPR_0,
+        ADDR_TCON
+    ]
+    used_sd_pins = []
+    used_wl_pins = []
+
+    def __init__(self, cs, bus=1, res=RES_10K, mode=MODE_11, baud=250000, sd=None, wl=None):
+        self.spi_bus = bus
+        self.baud = baud  # @250kHz actual baudrate=328125
+        self.set_mode(mode)
+
+        self.max_resistance = res 
+        self.cmderr = 1  # 0 is error
+
+        # chip select
+        self.cs_pin = Pin(cs)
+        if self.cs_pin.name() not in self.used_cs_pins:
+            self.cs_pin.init(mode=Pin.OUT, value=1)
+            self.used_cs_pins.append(self.cs_pin.name())
+        else:
+            raise Exception("Pin {} is already in use!".format(cs))
+
+        # shutdown
+        self.sd_pin = sd
+        if self.sd_pin:
+            self.sd_pin = Pin(sd)
+            if self.sd_pin.name() not in self.used_sd_pins:
+                self.sd_pin.init(mode=Pin.OUT, value=1)
+                self.used_sd_pins.append(self.sd_pin.name())
+            else:
+                raise Exception("Pin {} is already in use!".format(sd))
+
+        # wiper latch
+        self.wl_pin = wl
+        if self.wl_pin:
+            self.wl_pin = Pin(wl)
+            if self.wl_pin.name() not in self.used_wl_pins:
+                self.wl_pin.init(mode=Pin.OUT, value=0)
+                self.used_wl_pins.append(self.wl_pin.name())
+            else:
+                raise Exception("Pin {} is already in use!".format(wl))
+
+        self.spi = SPI(self.spi_bus, baudrate=self.baud, polarity=self.pol, phase=self.phase, firstbit=SPI.MSB)
+        # print(self.spi)  # show real baud rate
+
+    # not tested
+    # set/get wiper latch to sync transfers from register to wiper
+    def wiperLatch(self, l=-1):
+        if self.wl_pin != None:
+            if l == -1:
+                pass
+            else:
+                self.wl_pin(l)
+            return self.wl_pin()
+
+
+    # if shutdown pin not set, control shutdown through TCON register
+    # 1 is shutdown, 0 is not in shutdown (opp of value in TCON register)
+    def shutdown(self, s=-1):
+
+        # not tested
+        # shutdown through sd pin
+        if self.sd_pin != None:
+            if s == -1:
+                pass
+            else:
+                self.sd_pin(not s)
+            return not self.sd_pin()
+
+        # shutdown through tcon
+        else:
+            if s == -1:
+                pass
+            elif s:
+                s = 0
+            else:
+                s = 1
+            return not self.term_con(TERM_SHUTDOWN, s)

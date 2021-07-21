@@ -1,7 +1,8 @@
 import time
-import mcp4131 as mcp
+import mcp41xx31 as mcp
 
-pot1 = mcp.MCP4131("PA4")
+pot1 = mcp.MCP4131("PB12", bus=2, res=mcp.RES_10K)
+# pot1 = mcp.MCP41HV31("PB11", bus=2, res=mcp.RES_100K)
 
 # Enter shutdown mode
 # wiper at position B, A disconnected
